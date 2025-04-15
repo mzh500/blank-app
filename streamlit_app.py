@@ -620,13 +620,19 @@ def _start_camera_detection(model, threshold):
 
         # 创建视频保存路径
         timestamp = time.strftime("%Y%m%d_%H%M%S")
-        output_path = f"uploads/{st.session_state.username}/cam_{timestamp}.mp4"
+        output_path = f"uploads/{st.session_state.username}/cam_{timestamp}.mp4"  # 改为 .mp4
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-        # 初始化视频写入器
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        # 初始化视频写入器，使用 H.264 编码
+        fourcc = cv2.VideoWriter_fourcc(*'avc1')  # 或 'mp4v'
         frame_size = (int(cap.get(3)), int(cap.get(4)))
         writer = cv2.VideoWriter(output_path, fourcc, 20.0, frame_size)
+
+        # 检查写入器是否成功打开
+        if not writer.isOpened():
+            st.error("无法初始化视频写入器，请检查编码器或路径。")
+            cap.release()
+            return
 
         st.session_state.cam.update({
             'active': True,
@@ -697,8 +703,9 @@ def _show_camera_feed(model, threshold):
         # 显示处理后的画面
         frame_placeholder.image(result['annotated_image'], use_container_width=True)
 
-        # 写入视频文件
-        writer.write(cv2.cvtColor(np.array(result['annotated_image']), cv2.COLOR_RGB2BGR))
+        # 将处理后的帧写入视频文件（注意颜色转换）
+        annotated_frame_bgr = cv2.cvtColor(np.array(result['annotated_image']), cv2.COLOR_RGB2BGR)
+        writer.write(annotated_frame_bgr)
 
         time.sleep(0.01)  # 控制帧率
 
@@ -743,7 +750,8 @@ def show_history():
                     if ext in [".jpg", ".jpeg", ".png"]:
                         st.image(file_path, width=150)
                     elif ext in [".mp4", ".mov", ".avi"]:
-                        st.video(file_path)
+                        # 显式指定 MIME 类型
+                        st.video(file_path, format="video/mp4")  # 强制指定为 mp4
 
             st.markdown("</div>", unsafe_allow_html=True)
 
