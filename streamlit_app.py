@@ -578,92 +578,38 @@ def detection_tab():
 
 
 
-
     elif input_mode == "摄像头":
 
-        st.markdown("### 浏览器摄像头实时检测")
+        if 'cam' not in st.session_state:
+            st.session_state.cam = {
+                'active': False,
+                'cap': None,
+                'writer': None,
+                'output_path': '',
+                'no_mask': False,
+                'font': None  # 添加字体缓存
+            }
+            # 提前加载字体
+            if not st.session_state.cam['font']:
+                try:
+                    st.session_state.cam['font'] = ImageFont.truetype("simhei.ttf", 20)
+                except:
+                    st.session_state.cam['font'] = None
+                    st.warning("未找到中文字体文件，标签可能显示异常")
 
-        img_file_buffer = st.camera_input("点击按钮开始摄像头捕获")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("开始检测") and not st.session_state.cam['active']:
+                _start_camera_detection(yolo_model, threshold)
 
-        if img_file_buffer is not None:
+        with col2:
+            if st.button("停止检测") and st.session_state.cam['active']:
+                _stop_camera_detection()
 
-            # 将上传的图片转换为PIL格式
+        # 实时显示画面
+        if st.session_state.cam['active']:
+            _show_camera_feed(yolo_model, threshold)
 
-            img_pil = Image.open(img_file_buffer)
-
-            # 执行检测
-
-            result_dict = detect_objects_yolov8(
-
-                yolo_model,
-
-                img_pil,
-
-                conf_thres=threshold,
-
-                font=load_chinese_font()  # 需要确保字体加载函数
-
-            )
-
-            # 显示结果
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                st.image(img_pil, caption="原始画面", use_container_width=True)
-
-            with col2:
-
-                st.image(result_dict["annotated_image"], caption="检测结果", use_container_width=True)
-
-            # 保存记录
-
-            file_path = f"uploads/{st.session_state.username}/cam_{int(time.time())}.jpg"
-
-            img_pil.save(file_path)
-
-            # 检查是否检测到未戴口罩
-
-            no_mask_found = any(r['cls_name'] == "没带口罩" for r in result_dict["results"])
-
-            label = "没带口罩" if no_mask_found else "戴口罩"
-
-            confidence = max([r['confidence'] for r in result_dict["results"]], default=0.0)
-
-            save_detection_record(
-
-                st.session_state.username,
-
-                file_path,
-
-                label,
-
-                confidence
-
-            )
-
-            # 警报提示
-
-            if no_mask_found:
-                st.error("🚨 检测到未佩戴口罩！")
-
-                st.markdown("""
-
-                <script>
-
-                alert("检测到未佩戴口罩！");
-
-                </script>
-
-                """, unsafe_allow_html=True)
-
-
-def load_chinese_font():
-    try:
-        return ImageFont.truetype("simhei.ttf", 20)
-    except:
-        return ImageFont.load_default()
 
 def _start_camera_detection(model, threshold):
     """初始化摄像头和视频保存"""
